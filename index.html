@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>江呂餓鬼大学 総合学術データベース | EROGAKI UNIV. SYSTEM</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Noto+Serif+JP:wght@200;400;600;900&family=Shippori+Mincho:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* =================================================================
+           0. CORE VARIABLES & RESET
+           ================================================================= */
+        :root {
+            --c-main: #0e767c;        /* HORITA Teal */
+            --c-main-dark: #052a2c;
+            --c-main-light: #44babc;
+            --c-accent: #c93a3a;
+            --c-bg: #020303;
+            --c-panel: rgba(14, 118, 124, 0.05);
+            --c-text: #c0d1d3;
+            --c-white: #ffffff;
+            
+            --font-jp: 'Shippori Mincho', 'Noto Serif JP', serif;
+            --font-en: 'Cinzel', serif;
+            
+            --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html { font-size: 16px; scroll-behavior: smooth; }
+        
+        body {
+            background-color: var(--c-bg);
+            color: var(--c-text);
+            font-family: var(--font-jp);
+            line-height: 2.2;
+            overflow-x: hidden;
+            width: 100%;
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: var(--c-main-dark); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--c-main); }
+
+        a { text-decoration: none; color: inherit; transition: 0.3s; }
+        ul { list-style: none; }
+        img { width: 100%; display: block; }
+        ::selection { background: var(--c-main); color: #fff; }
+
+        /* =================================================================
+           1. LOAD SCREEN
+           ================================================================= */
+        #loader {
+            position: fixed; inset: 0;
+            background: #000; z-index: 10000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-family: var(--font-en);
+        }
+        
+        .loader-content { text-align: center; width: 80%; max-width: 600px; }
+        
+        .loader-logo {
+            font-size: 3rem; font-weight: 900; color: #fff;
+            letter-spacing: 0.1em; margin-bottom: 20px;
+            text-shadow: 0 0 20px rgba(14,118,124,0.5);
+        }
+        
+        .loader-horita {
+            font-size: 1.2rem; color: var(--c-main); letter-spacing: 0.3em;
+            margin-bottom: 40px; font-weight: 700;
+            border: 1px solid var(--c-main); padding: 5px 20px; display: inline-block;
+            animation: blink 2s infinite;
+        }
+
+        .progress-container {
+            width: 100%; height: 2px; background: #333; position: relative;
+            margin-bottom: 10px;
+        }
+        .progress-bar {
+            position: absolute; left: 0; top: 0; height: 100%; width: 0%;
+            background: var(--c-main);
+            transition: width 0.1s linear;
+            box-shadow: 0 0 10px var(--c-main);
+        }
+
+        .loader-log {
+            font-family: monospace; font-size: 0.8rem; color: #555; text-align: left;
+            height: 60px; overflow: hidden; border-top: 1px solid #222; padding-top: 10px;
+        }
+
+        @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
+
+        body.loaded #loader {
+            opacity: 0; pointer-events: none; transition: opacity 0.8s ease;
+        }
+
+        /* =================================================================
+           2. UTILITIES & ANIMATIONS
+           ================================================================= */
+        .u-container {
+            width: 90%; max-width: 1000px; margin: 0 auto;
+            position: relative; z-index: 2;
+        }
+
+        .u-section-pad { padding: 150px 0; }
+        .u-mb-m { margin-bottom: 4rem; }
+        .u-mb-l { margin-bottom: 6rem; }
+
+        .t-display {
+            font-family: var(--font-en);
+            font-size: clamp(3rem, 8vw, 6rem);
+            line-height: 1; font-weight: 700; color: #fff;
+            margin-bottom: 2rem; letter-spacing: -0.02em;
+        }
+        
+        .t-h2 {
+            font-size: clamp(1.8rem, 4vw, 2.5rem);
+            margin-bottom: 2rem; line-height: 1.4;
+            background: linear-gradient(to right, #fff, var(--c-main));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+
+        .t-h3 {
+            font-size: 1.3rem; color: #fff; margin-bottom: 1rem;
+            border-left: 4px solid var(--c-main); padding-left: 15px;
+            font-weight: 600;
+        }
+
+        .t-label {
+            font-family: var(--font-en); font-size: 0.8rem;
+            letter-spacing: 0.2em; color: var(--c-main);
+            display: block; margin-bottom: 1rem; text-transform: uppercase;
+        }
+
+        /* Animations */
+        .fade-up {
+            opacity: 0; transform: translateY(40px);
+            transition: opacity 1.2s ease, transform 1.2s var(--ease-out);
+        }
+        .fade-up.is-inview { opacity: 1; transform: translateY(0); }
+        
+        .delay-100 { transition-delay: 0.1s; }
+        .delay-200 { transition-delay: 0.2s; }
+        .delay-300 { transition-delay: 0.3s; }
+
+        /* =================================================================
+           3. COMPONENTS
+           ================================================================= */
+        /* Header */
+        .header {
+            position: fixed; top: 0; left: 0; width: 100%;
+            padding: 1.5rem 5%;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 100;
+            background: linear-gradient(to bottom, rgba(2,3,3,0.95), transparent);
+            backdrop-filter: blur(5px);
+        }
+        .logo { font-family: var(--font-en); font-weight: 900; letter-spacing: 0.1em; color:#fff; }
+        .logo-sub { font-size: 0.7rem; font-family: var(--font-en); color: var(--c-main); text-align: right; }
+
+        /* Background Canvas */
+        #bg-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; opacity: 0.6;
+        }
+
+        /* Article Text */
+        .long-text {
+            text-align: justify; margin-bottom: 2rem; font-size: 1.05rem;
+        }
+
+        /* Box Design */
+        .academic-box {
+            background: var(--c-panel);
+            border: 1px solid rgba(14, 118, 124, 0.2);
+            padding: 40px; margin-bottom: 30px;
+            transition: 0.3s;
+        }
+        .academic-box:hover {
+            border-color: var(--c-main);
+            background: rgba(14, 118, 124, 0.08);
+        }
+
+        /* =================================================================
+           4. GRAPH ANIMATIONS
+           ================================================================= */
+        .chart-container {
+            margin: 4rem 0; padding: 2rem;
+            border: 1px solid #333; background: rgba(0,0,0,0.5);
+        }
+        .chart-title { font-family: var(--font-en); color: var(--c-main); margin-bottom: 2rem; text-align: center; }
+
+        /* Bar Chart */
+        .bar-chart {
+            display: flex; justify-content: space-around; align-items: flex-end;
+            height: 250px; border-bottom: 1px solid #555; padding-bottom: 10px;
+        }
+        .bar-wrap { width: 12%; text-align: center; }
+        .bar {
+            width: 100%; background: linear-gradient(to top, var(--c-main-dark), var(--c-main));
+            height: 0; transition: height 2s var(--ease-out);
+            border-top: 2px solid #fff; position: relative;
+        }
+        .bar-val {
+            position: absolute; top: -25px; left: 50%; transform: translateX(-50%);
+            font-family: var(--font-en); font-size: 0.8rem; color: #fff; opacity: 0; transition: 2s;
+        }
+        .bar-year { font-size: 0.8rem; margin-top: 10px; color: #888; }
+        
+        .is-inview .bar { height: var(--h); }
+        .is-inview .bar-val { opacity: 1; }
+
+        /* Line Chart (SVG) */
+        .line-chart-svg { width: 100%; height: 300px; overflow: visible; }
+        .line-path {
+            fill: none; stroke: var(--c-main); stroke-width: 3;
+            stroke-dasharray: 2000; stroke-dashoffset: 2000;
+            transition: stroke-dashoffset 3s ease-out;
+        }
+        .grid-line { stroke: #333; stroke-width: 1; }
+        .is-inview .line-path { stroke-dashoffset: 0; }
+
+        /* =================================================================
+           5. 3D PENCIL STAGE (THREE.JS)
+           ================================================================= */
+        #product-3d-container {
+            width: 100%;
+            height: 600px;
+            background: radial-gradient(circle, #1a1a1a 0%, #000 70%);
+            position: relative;
+            overflow: hidden;
+            border-top: 1px solid #333;
+            border-bottom: 1px solid #333;
+            cursor: move; /* Indicates interactability */
+        }
+        canvas { display: block; } /* For Three.js canvas */
+
+        /* =================================================================
+           6. SECTIONS
+           ================================================================= */
+        /* Quiz */
+        .quiz-container { border: 1px solid #333; padding: 3rem; margin-top: 3rem; }
+        .quiz-q { font-size: 1.2rem; font-weight: bold; margin-bottom: 2rem; }
+        .quiz-btn {
+            display: block; width: 100%; text-align: left; padding: 1.5rem;
+            background: #111; border: 1px solid #333; color: #ccc; margin-bottom: 1rem;
+            transition: 0.2s; cursor: pointer;
+        }
+        .quiz-btn:hover { background: var(--c-main); color: #fff; }
+
+        /* Footer */
+        .footer {
+            padding: 5rem 0; border-top: 1px solid #222; text-align: center;
+            font-size: 0.8rem; color: #666;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div id="loader">
+        <div class="loader-content">
+            <div class="loader-logo">EROGAKI UNIV.</div>
+            <div class="loader-horita">MADE IN HORITA</div>
+            
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            
+            <div class="loader-log" id="loaderLog">
+                System initializing...
+            </div>
+        </div>
+    </div>
+
+    <header class="header">
+        <div class="logo">EROGAKI UNIV.</div>
+        <div class="logo-sub">
+            ACADEMIC DATABASE<br>
+            Directed by HORITA
+        </div>
+    </header>
+
+    <main>
+        <section class="u-section-pad" style="height: 100vh; display: flex; align-items: center;">
+            <div class="u-container">
+                <span class="t-label fade-up">ESTABLISHED 1919 / TOKYO</span>
+                <h1 class="t-display fade-up delay-100">
+                    TRUTH IN<br>
+                    <span style="color:var(--c-main);">DARKNESS</span>
+                </h1>
+                <p class="long-text fade-up delay-200" style="max-width: 600px; color: #aaa;">
+                    江呂餓鬼大学は、「性」と「知」の融合を目指す、世界でも稀有な総合研究機関です。
+                    我々は、人間の根源的な衝動である「下心」を否定せず、それを学問的探究のエネルギーへと変換します。
+                    偏差値72。ここでは、あなたの歪んだ欲望こそが、真理への鍵となります。
+                </p>
+                <div class="fade-up delay-300" style="margin-top: 40px; font-family: var(--font-en); font-size: 0.8rem; color: var(--c-main);">
+                    SCROLL TO ACCESS DATABASE ▼
+                </div>
+            </div>
+        </section>
+
+        <section class="u-section-pad">
+            <div class="u-container">
+                <span class="t-label fade-up">RESEARCH DATA</span>
+                <h2 class="t-h2 fade-up">Analysis of Instinct</h2>
+                <p class="long-text fade-up">
+                    本学の研究機関「妄想研究所」が長年にわたり収集した膨大なデータの一部を公開します。
+                    これらのグラフは、人間の欲望がいかにして社会的成功や学術的成果に結びつくかを如実に示しています。
+                </p>
+
+                <div class="chart-container fade-up">
+                    <div class="chart-title">■ HORITAメソッド導入による学習集中力の変化</div>
+                    <div class="bar-chart" id="barChart">
+                        <div class="bar-wrap"><div class="bar" style="--h: 20%;"><span class="bar-val">20</span></div><div class="bar-year">Gen 1</div></div>
+                        <div class="bar-wrap"><div class="bar" style="--h: 35%;"><span class="bar-val">35</span></div><div class="bar-year">Gen 2</div></div>
+                        <div class="bar-wrap"><div class="bar" style="--h: 50%;"><span class="bar-val">50</span></div><div class="bar-year">Gen 3</div></div>
+                        <div class="bar-wrap"><div class="bar" style="--h: 85%;"><span class="bar-val">85</span></div><div class="bar-year">HORITA</div></div>
+                        <div class="bar-wrap"><div class="bar" style="--h: 98%;"><span class="bar-val">98</span></div><div class="bar-year">Future</div></div>
+                    </div>
+                    <p style="font-size:0.8rem; color:#888; margin-top:20px;">※HORITA製文具 導入後、学生のパフォーマンスが飛躍的に向上。</p>
+                </div>
+
+                <div class="chart-container fade-up">
+                    <div class="chart-title">■ 妄想力と生涯年収の相関関係 (n=50,000)</div>
+                    <div class="line-chart-svg is-inview-trigger">
+                        <svg viewBox="0 0 400 200" width="100%" height="100%">
+                            <line x1="0" y1="50" x2="400" y2="50" class="grid-line" stroke="#222" />
+                            <line x1="0" y1="100" x2="400" y2="100" class="grid-line" stroke="#222" />
+                            <line x1="0" y1="150" x2="400" y2="150" class="grid-line" stroke="#222" />
+                            <path class="line-path" d="M0,180 C100,170 150,120 200,100 S300,80 400,20" />
+                        </svg>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#666;">
+                        <span>Low Imagination</span>
+                        <span>High Imagination</span>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <section class="u-section-pad">
+            <div class="u-container">
+                <span class="t-label fade-up">ACADEMIC DISCIPLINES</span>
+                <h2 class="t-h2 fade-up">8つの学部と研究領域</h2>
+                <p class="long-text fade-up u-mb-l">
+                    江呂餓鬼大学には8つの専門学部が存在し、それぞれの「フェティシズム」を学問として体系化しています。
+                    各学部は独立した研究棟を持ち、日夜、倫理規定の限界に挑戦する実験が行われています。
+                </p>
+
+                <div class="academic-box fade-up">
+                    <span style="font-size:2.5rem; color:var(--c-main);">📐</span>
+                    <h3 class="t-h3">工学部 硬度増強学科</h3>
+                    <p class="long-text">
+                        <strong>「硬さ」こそが正義である。</strong><br>
+                        当学科では、チタン合金、ダイヤモンド、そして人の意志など、あらゆる物質の硬度を極限まで高めるマテリアルサイエンスを専攻します。特に「持続力」に関する研究は世界最高水準を誇り、NASAからも技術提供の依頼が来るほどです。
+                    </p>
+                </div>
+
+                <div class="academic-box fade-up">
+                    <span style="font-size:2.5rem; color:var(--c-main);">👙</span>
+                    <h3 class="t-h3">理学部 絶対領域数理学科</h3>
+                    <p class="long-text">
+                        ニーハイソックスとスカートの間に生じる不可侵領域（Absolute Territory）。その黄金比「4:1:2.5」がなぜ人類を魅了するのかを、量子力学とトポロジーを用いて数学的に解明します。1ミリのズレが世界を変えることを、数式で証明するのです。
+                    </p>
+                </div>
+
+                <div class="academic-box fade-up">
+                    <span style="font-size:2.5rem; color:var(--c-main);">🔞</span>
+                    <h3 class="t-h3">文学部 官能表現学科</h3>
+                    <p class="long-text">
+                        直接的な表現を用いずに、いかに行間から湿り気を帯びたフェロモンを漂わせるか。「袋とじ」を開封する際の心理的カタルシスや、伏せ字（●●）が持つ無限の可能性について研究します。言葉だけで人を昇天させる技術を磨きます。
+                    </p>
+                </div>
+
+                <div class="academic-box fade-up">
+                    <span style="font-size:2.5rem; color:var(--c-main);">🍄</span>
+                    <h3 class="t-h3">農学部 キノコ生態学科</h3>
+                    <p class="long-text">
+                        立派に育てるための湿度管理、栄養配分、そして愛情の注ぎ方。あなたのキノコも、本学の「HORITAメソッド」を用いれば驚くほど逞しく、太く成長します。実習では森に入り、ひたすら形状の観察と比較を行います。
+                    </p>
+                </div>
+
+                <div class="academic-box fade-up">
+                    <span style="font-size:2.5rem; color:var(--c-main);">💰</span>
+                    <h3 class="t-h3">経済学部 夜の蝶経営学科</h3>
+                    <p class="long-text">
+                        シャンパンタワーの構造計算から、太客の財布の紐を緩める行動経済学まで。「アフター」における費用対効果（ROI）を最大化するための高度な交渉術を学びます。実習費が最も高い学部ですが、卒業後の回収率はNo.1です。
+                    </p>
+                </div>
+
+                <div class="academic-box fade-up">
+                    <span style="font-size:2.5rem; color:var(--c-main);">🏥</span>
+                    <h3 class="t-h3">医学部 視線誘導学科</h3>
+                    <p class="long-text">
+                        「どこを見ているのですか？」と問われないための、高度な眼球運動トレーニング。周辺視野を拡大し、対象を直視せずに詳細なスリーサイズデータを脳内にスキャンする技術を習得します。国家試験合格率100%。
+                    </p>
+                </div>
+
+                <div class="academic-box fade-up">
+                    <span style="font-size:2.5rem; color:var(--c-main);">😒</span>
+                    <h3 class="t-h3">心理学部 ツンデレ行動学科</h3>
+                    <p class="long-text">
+                        「別にあんたのためにやったんじゃないんだからね！」という発言の裏に隠された、98%の好意と2%の照れを解析。拒絶から受容へのプロセス（デレ期）への移行タイミングを科学的に特定します。
+                    </p>
+                </div>
+
+                <div class="academic-box fade-up">
+                    <span style="font-size:2.5rem; color:var(--c-main);">🤸</span>
+                    <h3 class="t-h3">体育学部 ローアングル撮影学科</h3>
+                    <p class="long-text">
+                        いかに低い姿勢から、ダイナミックかつ芸術的な構図を切り取るか。地面スレスレを這うための柔軟性と、シャッターチャンスを逃さない反射神経を鍛え上げます。※犯罪行為は厳禁。あくまで芸術としてのローアングルです。
+                    </p>
+                </div>
+
+            </div>
+        </section>
+
+        <section class="u-section-pad" style="background:#050505;">
+            <div class="u-container">
+                <div style="text-align:center; margin-bottom:50px;">
+                    <span class="t-label fade-up">OFFICIAL STATIONERY</span>
+                    <h2 class="t-display fade-up">HORITA<br>MECH. PENCIL</h2>
+                    <p class="fade-up" style="color:#888;">
+                        校長堀田が設計した、思考を具現化するための超精密筆記具。<br>
+                        金属光沢、ローレット加工の質感。すべてが真の学問のために。<br>
+                        ※ドラッグ/スワイプで360度確認せよ。
+                    </p>
+                </div>
+
+                <div id="product-3d-container" class="fade-up"></div>
+                
+                <div style="text-align:center; margin-top:40px;" class="fade-up">
+                    <p style="font-family:var(--font-en); font-weight:bold; color:var(--c-accent); letter-spacing:0.1em; font-size:1.2rem;">
+                        NOT FOR SALE
+                    </p>
+                    <p style="font-size:0.8rem; color:#555; margin-top:10px;">
+                        ※本製品は学長室でのみ使用が許可されています。
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="u-section-pad">
+            <div class="u-container">
+                <div style="max-width:800px; margin:0 auto;">
+                    <h2 class="t-h2 fade-up" style="text-align:center;">Admission Test</h2>
+                    <p class="long-text fade-up" style="text-align:center; color:#aaa;">
+                        入学には、偏差値よりも「歪んだ常識」と「柔軟な思考」が求められます。<br>
+                        以下の問いに答え、あなたの適性を証明してください。
+                    </p>
+
+                    <div class="quiz-container fade-up">
+                        <div class="quiz-q">Q. 「絶対領域」の美しさを決定づける、最も重要な物理的要因は何か？</div>
+                        <button class="quiz-btn" onclick="alert('不合格：素人です。出直してください。')">
+                            A. ソックスの丈の長さ
+                        </button>
+                        <button class="quiz-btn" onclick="alert('不合格：肌の白さだけでは芸術点に欠けます。')">
+                            B. 肌の質感と色味
+                        </button>
+                        <button class="quiz-btn" onclick="alert('合格！あなたは天才ですか？それとも変態ですか？（褒め言葉）江呂餓鬼大学へようこそ。')">
+                            C. ソックスの上端に乗る、わずかな「お肉」の食い込み具合 (The Flesh Dent)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        <div class="u-container">
+            <div style="font-size:2.5rem; font-family:var(--font-en); font-weight:900; color:#fff; margin-bottom:20px;">EROGAKI UNIV.</div>
+            <p style="margin-bottom:30px;">
+                〒191-9072 東京都秘宝館区妄想1-9-19<br>
+                Truth lies beyond the pixel mosaic.
+            </p>
+            <div style="border-top:1px solid #333; padding-top:20px;">
+                <p style="color:var(--c-main); font-weight:bold; font-family:var(--font-en); letter-spacing:0.1em;">
+                    MADE IN HORITA
+                </p>
+                <p>&copy; 2025 EROGAKI UNIVERSITY. All Rights Reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const body = document.body;
+            const loader = document.getElementById('loader');
+            const progressBar = document.getElementById('progressBar');
+            const log = document.getElementById('loaderLog');
+            
+            // 1. LOADER SEQUENCE (~2.8 seconds)
+            const totalDuration = 2800;
+            const intervalTime = 30;
+            const steps = totalDuration / intervalTime;
+            const increment = 100 / steps;
+            
+            const logs = [
+                "Initializing core kernel...",
+                "Loading HORITA geometry...",
+                "Compiling 3D Pencil Shaders...",
+                "Connecting to Erogaki Net...",
+                "Optimizing reflections...",
+                "Checking user aptitude...",
+                "Finalizing..."
+            ];
+            
+            let currentProgress = 0;
+            let logIndex = 0;
+            
+            const interval = setInterval(() => {
+                currentProgress += increment; 
+                if(currentProgress > 100) currentProgress = 100;
+                
+                progressBar.style.width = currentProgress + '%';
+                
+                // Show logs
+                if (currentProgress > (logIndex * 15) && logIndex < logs.length) {
+                    log.innerHTML = `> ${logs[logIndex]}`;
+                    logIndex++;
+                }
+
+                if (currentProgress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        body.classList.add('loaded');
+                        initCanvas(); // Start Starfield
+                        initThreeJS(); // Start 3D Pencil
+                    }, 300);
+                }
+            }, intervalTime); 
+
+
+            // 2. SCROLL REVEAL & GRAPH ANIMATION
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-inview');
+                        
+                        // Bar Graph Trigger
+                        if(entry.target.id === 'barChart') {
+                            const bars = entry.target.querySelectorAll('.bar');
+                            bars.forEach(bar => {
+                                bar.style.height = bar.style.getPropertyValue('--h');
+                            });
+                        }
+                    }
+                });
+            }, { threshold: 0.15 });
+
+            document.querySelectorAll('.fade-up, .line-chart-svg, #barChart').forEach(el => observer.observe(el));
+
+
+            // 3. THREE.JS 3D PENCIL GENERATION
+            function initThreeJS() {
+                const container = document.getElementById('product-3d-container');
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+
+                // Scene
+                const scene = new THREE.Scene();
+                // Transparent bg handled by renderer alpha
+
+                // Camera
+                const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+                camera.position.set(15, 15, 20);
+
+                // Renderer
+                const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+                renderer.setSize(width, height);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                container.appendChild(renderer.domElement);
+
+                // Controls
+                const controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                controls.enableZoom = false; // Disable zoom to prevent breaking layout
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 2.0;
+
+                // Materials
+                const bodyMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x0e767c, // Teal
+                    metalness: 0.6,
+                    roughness: 0.2
+                });
+                const gripMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x222222,
+                    metalness: 0.8,
+                    roughness: 0.7 // Rough for grip look
+                });
+                const metalMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xaaaaaa,
+                    metalness: 1.0,
+                    roughness: 0.2
+                });
+
+                // Group
+                const pencilGroup = new THREE.Group();
+                scene.add(pencilGroup);
+
+                // --- Geometries ---
+
+                // 1. Body (Hexagonal Cylinder)
+                const bodyGeo = new THREE.CylinderGeometry(1, 1, 16, 6);
+                const bodyMesh = new THREE.Mesh(bodyGeo, bodyMaterial);
+                bodyMesh.position.y = 2; // Center it a bit
+                pencilGroup.add(bodyMesh);
+
+                // 2. Grip (Cylinder)
+                const gripGeo = new THREE.CylinderGeometry(1.05, 1.05, 6, 32);
+                const gripMesh = new THREE.Mesh(gripGeo, gripMaterial);
+                gripMesh.position.y = -9;
+                pencilGroup.add(gripMesh);
+
+                // 3. Tip (Cone)
+                const tipGeo = new THREE.CylinderGeometry(0.2, 1.05, 2, 32);
+                const tipMesh = new THREE.Mesh(tipGeo, metalMaterial);
+                tipMesh.position.y = -13;
+                pencilGroup.add(tipMesh);
+
+                // 4. Lead (Tiny Cylinder)
+                const leadGeo = new THREE.CylinderGeometry(0.05, 0.05, 1, 8);
+                const leadMesh = new THREE.Mesh(leadGeo, new THREE.MeshBasicMaterial({color:0x111111}));
+                leadMesh.position.y = -14.5;
+                pencilGroup.add(leadMesh);
+
+                // 5. Cap/Eraser area
+                const capGeo = new THREE.CylinderGeometry(0.8, 0.8, 2, 32);
+                const capMesh = new THREE.Mesh(capGeo, metalMaterial);
+                capMesh.position.y = 11;
+                pencilGroup.add(capMesh);
+                
+                // 6. Clip (Box)
+                const clipGeo = new THREE.BoxGeometry(0.4, 6, 0.8);
+                const clipMesh = new THREE.Mesh(clipGeo, metalMaterial);
+                clipMesh.position.set(1.2, 8, 0);
+                pencilGroup.add(clipMesh);
+
+
+                // Lights
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+                scene.add(ambientLight);
+
+                const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+                dirLight.position.set(10, 20, 10);
+                scene.add(dirLight);
+                
+                const pointLight = new THREE.PointLight(0x0e767c, 2, 50); // Teal glow
+                pointLight.position.set(-10, 0, 10);
+                scene.add(pointLight);
+
+                // Rotation adjustment to look like a pen
+                pencilGroup.rotation.z = Math.PI / 4; 
+
+                // Animation Loop
+                function animate3D() {
+                    requestAnimationFrame(animate3D);
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+                animate3D();
+
+                // Handle Resize
+                window.addEventListener('resize', () => {
+                    const newWidth = container.clientWidth;
+                    const newHeight = container.clientHeight;
+                    renderer.setSize(newWidth, newHeight);
+                    camera.aspect = newWidth / newHeight;
+                    camera.updateProjectionMatrix();
+                });
+            }
+
+
+            // 4. CANVAS CONSTELLATION (STARFIELD)
+            function initCanvas() {
+                const canvas = document.getElementById('bg-canvas');
+                const ctx = canvas.getContext('2d');
+                let w, h;
+                let particles = [];
+                let interact = { x: -999, y: -999 };
+
+                const resize = () => { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; };
+                window.addEventListener('resize', resize);
+                resize();
+
+                const updateInteract = (x, y) => { interact.x = x; interact.y = y; };
+                window.addEventListener('mousemove', e => updateInteract(e.clientX, e.clientY));
+                window.addEventListener('touchstart', e => updateInteract(e.touches[0].clientX, e.touches[0].clientY), {passive:true});
+                window.addEventListener('touchmove', e => updateInteract(e.touches[0].clientX, e.touches[0].clientY), {passive:true});
+                window.addEventListener('touchend', () => updateInteract(-999, -999));
+
+                class Particle {
+                    constructor() {
+                        this.x = Math.random() * w;
+                        this.y = Math.random() * h;
+                        this.vx = (Math.random() - 0.5) * 0.5;
+                        this.vy = (Math.random() - 0.5) * 0.5;
+                        this.size = Math.random() * 1.5;
+                        this.baseX = this.x;
+                        this.baseY = this.y;
+                    }
+
+                    update() {
+                        this.x += this.vx;
+                        this.y += this.vy;
+
+                        // Mouse interaction
+                        let dx = interact.x - this.x;
+                        let dy = interact.y - this.y;
+                        let dist = Math.sqrt(dx * dx + dy * dy);
+                        let maxDist = 100;
+
+                        if (dist < maxDist) {
+                            let force = (maxDist - dist) / maxDist;
+                            let dirX = (dx / dist) * force * 5;
+                            let dirY = (dy / dist) * force * 5;
+                            this.x -= dirX;
+                            this.y -= dirY;
+                        }
+
+                        // Wrap screen
+                        if (this.x < 0) this.x = w;
+                        if (this.x > w) this.x = 0;
+                        if (this.y < 0) this.y = h;
+                        if (this.y > h) this.y = 0;
+                    }
+
+                    draw() {
+                        ctx.fillStyle = "rgba(14, 118, 124, 0.4)";
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+
+                // Create Particles
+                for (let i = 0; i < 100; i++) {
+                    particles.push(new Particle());
+                }
+
+                function animate() {
+                    ctx.clearRect(0, 0, w, h);
+                    
+                    // Connect lines
+                    for (let i = 0; i < particles.length; i++) {
+                        let p = particles[i];
+                        p.update();
+                        p.draw();
+
+                        for (let j = i; j < particles.length; j++) {
+                            let p2 = particles[j];
+                            let dx = p.x - p2.x;
+                            let dy = p.y - p2.y;
+                            let dist = Math.sqrt(dx*dx + dy*dy);
+                            
+                            if (dist < 100) {
+                                ctx.strokeStyle = `rgba(14, 118, 124, ${0.2 * (1 - dist/100)})`;
+                                ctx.lineWidth = 0.5;
+                                ctx.beginPath();
+                                ctx.moveTo(p.x, p.y);
+                                ctx.lineTo(p2.x, p2.y);
+                                ctx.stroke();
+                            }
+                        }
+                    }
+                    requestAnimationFrame(animate);
+                }
+                animate();
+            }
+        });
+    </script>
+</body>
+</html>
